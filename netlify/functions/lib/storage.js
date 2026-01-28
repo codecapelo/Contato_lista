@@ -42,8 +42,24 @@ async function ensureLocalFile(filePath) {
 export async function loadPatients() {
   if (isNetlifyRuntime()) {
     const store = getStoreClient()
-    const data = await store.get(STORE_KEY, { type: 'json' })
-    return Array.isArray(data) ? data : []
+    const raw = await store.get(STORE_KEY)
+    if (Array.isArray(raw)) return raw
+    if (raw && typeof raw === 'object') {
+      return Array.isArray(raw.patients) ? raw.patients : []
+    }
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        const csvRaw = await store.get(CSV_KEY)
+        if (typeof csvRaw === 'string') {
+          return parseCsvPatients(csvRaw)
+        }
+        return []
+      }
+    }
+    return []
   }
 
   const filePath = path.resolve(process.cwd(), 'data', 'patients.json')
@@ -56,8 +72,8 @@ export async function loadPatients() {
 export async function savePatients(patients) {
   if (isNetlifyRuntime()) {
     const store = getStoreClient()
-    await store.set(STORE_KEY, patients)
-    await store.set(CSV_KEY, serializeCsv(patients))
+    await store.set(STORE_KEY, JSON.stringify(patients), { contentType: 'application/json' })
+    await store.set(CSV_KEY, serializeCsv(patients), { contentType: 'text/csv; charset=utf-8' })
     return
   }
 
@@ -110,6 +126,35 @@ export function formatDateBR(value) {
     return `${d}/${m}/${y}`
   }
   return raw
+}
+
+function parseCsvLine(line) {
+  return line.split(',').map((cell) => cell.trim())
+}
+
+function parseCsvPatients(csv) {
+  const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(Boolean)
+  if (!lines.length) return []
+  const header = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
+  const idx = {
+    nome: header.indexOf('nome completo'),
+    celular: header.indexOf('celular'),
+    cpf: header.indexOf('cpf'),
+    sexo: header.indexOf('sexo'),
+    nasc: header.indexOf('data de nascimento'),
+    email: header.indexOf('email')
+  }
+  return lines.slice(1).map((line) => {
+    const cols = parseCsvLine(line)
+    return {
+      nome_completo: cols[idx.nome] || '',
+      celular: cols[idx.celular] || '',
+      cpf: cols[idx.cpf] || '',
+      sexo: cols[idx.sexo] || '',
+      data_nascimento: cols[idx.nasc] || '',
+      email: cols[idx.email] || ''
+    }
+  }).filter((p) => p.nome_completo || p.celular || p.cpf || p.email)
 }
 
 export function serializeCsv(patients) {
