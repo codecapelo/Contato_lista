@@ -4,7 +4,29 @@ import path from 'path'
 
 const STORE_NAME = 'patients-store'
 const STORE_KEY = 'patients.json'
-const useBlobs = Boolean(process.env.SITE_ID)
+
+export function getEnv(key) {
+  if (globalThis.Netlify?.env?.get) return Netlify.env.get(key)
+  return process.env[key]
+}
+
+function getStoreClient() {
+  const siteID = getEnv('NETLIFY_SITE_ID') || getEnv('SITE_ID')
+  const token =
+    getEnv('NETLIFY_BLOBS_TOKEN') ||
+    getEnv('NETLIFY_AUTH_TOKEN') ||
+    getEnv('NETLIFY_API_TOKEN')
+
+  if (siteID && token) {
+    return getStore(STORE_NAME, { siteID, token })
+  }
+
+  return getStore(STORE_NAME)
+}
+
+function isNetlifyRuntime() {
+  return Boolean(getEnv('NETLIFY') || getEnv('NETLIFY_SITE_ID') || getEnv('SITE_ID'))
+}
 
 async function ensureLocalFile(filePath) {
   const dir = path.dirname(filePath)
@@ -17,8 +39,8 @@ async function ensureLocalFile(filePath) {
 }
 
 export async function loadPatients() {
-  if (useBlobs) {
-    const store = getStore(STORE_NAME)
+  if (isNetlifyRuntime()) {
+    const store = getStoreClient()
     const data = await store.get(STORE_KEY, { type: 'json' })
     return Array.isArray(data) ? data : []
   }
@@ -31,8 +53,8 @@ export async function loadPatients() {
 }
 
 export async function savePatients(patients) {
-  if (useBlobs) {
-    const store = getStore(STORE_NAME)
+  if (isNetlifyRuntime()) {
+    const store = getStoreClient()
     await store.set(STORE_KEY, patients)
     return
   }
@@ -115,27 +137,42 @@ export function upsertOne(patients, record) {
 }
 
 export function withCors(statusCode, body, headers = {}) {
+  const payload = typeof body === 'string' ? body : JSON.stringify(body)
+  const finalHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, x-admin-token',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    ...headers
+  }
+
+  if (typeof Response === 'function') {
+    return new Response(payload, { status: statusCode, headers: finalHeaders })
+  }
+
   return {
     statusCode,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, x-admin-token',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      ...headers
-    },
-    body: typeof body === 'string' ? body : JSON.stringify(body)
+    headers: finalHeaders,
+    body: payload
   }
 }
 
 export function getAdminToken() {
-  return process.env.ADMIN_TOKEN || ''
+  return getEnv('ADMIN_TOKEN') || ''
 }
 
-export function readBody(event) {
-  if (!event.body) return {}
-  const raw = event.isBase64Encoded
-    ? Buffer.from(event.body, 'base64').toString('utf-8')
-    : event.body
+export async function readBody(input) {
+  if (!input) return {}
+  if (typeof input.json === 'function') {
+    try {
+      return await input.json()
+    } catch {
+      return {}
+    }
+  }
+  if (!input.body) return {}
+  const raw = input.isBase64Encoded
+    ? Buffer.from(input.body, 'base64').toString('utf-8')
+    : input.body
   try {
     return JSON.parse(raw)
   } catch {
@@ -146,7 +183,7 @@ export function readBody(event) {
 export function mapStorageError(err) {
   const msg = err?.message || 'Erro interno'
   if (msg.includes('NETLIFY_BLOBS') || msg.toLowerCase().includes('blobs')) {
-    return 'Netlify Blobs não habilitado. Ative Blobs no painel do Netlify e redeploy.'
+    return 'Netlify Blobs não configurado para este runtime. Verifique se Blobs está ativo no site, faça redeploy e confirme que a Function é v2.'
   }
   return msg
 }

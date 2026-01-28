@@ -8,18 +8,19 @@ import {
   mapStorageError
 } from './lib/storage.js'
 
-export const handler = async (event) => {
+export default async (req) => {
   try {
-    if (event.httpMethod === 'OPTIONS') {
+    if (req.method === 'OPTIONS') {
       return withCors(200, '')
     }
 
-    if (event.httpMethod !== 'GET') {
+    if (req.method !== 'GET') {
       return withCors(405, { ok: false, error: 'Método não suportado' })
     }
 
     const adminToken = getAdminToken()
-    const token = event.headers['x-admin-token'] || event.queryStringParameters?.token || ''
+    const url = new URL(req.url)
+    const token = req.headers.get('x-admin-token') || url.searchParams.get('token') || ''
     if (adminToken && token !== adminToken) {
       return withCors(401, { ok: false, error: 'Não autorizado' })
     }
