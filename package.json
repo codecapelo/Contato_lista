@@ -1,0 +1,30 @@
+{
+  "name": "tabela_contato",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "nodemon server/index.js",
+    "dev:client": "npm run --prefix client dev",
+    "build": "npm run build:client",
+    "build:client": "npm run --prefix client build",
+    "start": "node server/index.js",
+    "dev:spa": "npm run dev:client",
+    "dev:netlify": "npx netlify dev"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "@netlify/blobs": "^7.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.3",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.3",
+    "vite": "^5.1.4"
+  }
+}

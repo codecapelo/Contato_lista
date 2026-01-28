@@ -1,0 +1,20 @@
+[build]
+  command = "npm run build:client"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm run dev:client"
+  targetPort = 5173
+  port = 8888
+  functions = "netlify/functions"
+
+[[redirects]]
+  from = "/api/patients"
+  to = "/.netlify/functions/patients"
+  status = 200
+
+[[redirects]]
+  from = "/api/patients/export"
+  to = "/.netlify/functions/export"
+  status = 200
