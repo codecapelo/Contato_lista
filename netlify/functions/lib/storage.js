@@ -142,3 +142,11 @@ export function readBody(event) {
     return {}
   }
 }
+
+export function mapStorageError(err) {
+  const msg = err?.message || 'Erro interno'
+  if (msg.includes('NETLIFY_BLOBS') || msg.toLowerCase().includes('blobs')) {
+    return 'Netlify Blobs não habilitado. Ative Blobs no painel do Netlify e redeploy.'
+  }
+  return msg
+}

@@ -41,7 +41,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'Erro no servidor')
       setMessage('Cadastro enviado com sucesso. Obrigado!')
       setForm(emptyForm)
