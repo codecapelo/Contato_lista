@@ -1,11 +1,9 @@
 import {
   loadPatients,
-  formatCPF,
-  formatCelular,
-  formatDateBR,
   withCors,
   getAdminToken,
-  mapStorageError
+  mapStorageError,
+  serializeCsv
 } from './lib/storage.js'
 
 export default async (req) => {
@@ -26,19 +24,7 @@ export default async (req) => {
     }
 
     const patients = await loadPatients()
-    const header = ['Nome Completo', 'Celular', 'CPF', 'Sexo', 'Data de Nascimento', 'Email']
-    const rows = patients.map((p) => [
-      p.nome_completo || '',
-      formatCelular(p.celular),
-      formatCPF(p.cpf),
-      p.sexo || '',
-      formatDateBR(p.data_nascimento),
-      p.email || ''
-    ])
-
-    const csv = [header, ...rows]
-      .map((r) => r.map((c) => (c || '').toString().replace(/\r?\n/g, ' ')).join(','))
-      .join('\n')
+    const csv = serializeCsv(patients)
 
     return withCors(200, csv, {
       'Content-Type': 'text/csv; charset=utf-8',

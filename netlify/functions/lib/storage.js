@@ -4,6 +4,7 @@ import path from 'path'
 
 const STORE_NAME = 'patients-store'
 const STORE_KEY = 'patients.json'
+const CSV_KEY = 'patients.csv'
 
 export function getEnv(key) {
   if (globalThis.Netlify?.env?.get) return Netlify.env.get(key)
@@ -56,12 +57,16 @@ export async function savePatients(patients) {
   if (isNetlifyRuntime()) {
     const store = getStoreClient()
     await store.set(STORE_KEY, patients)
+    await store.set(CSV_KEY, serializeCsv(patients))
     return
   }
 
   const filePath = path.resolve(process.cwd(), 'data', 'patients.json')
   await ensureLocalFile(filePath)
   await fs.writeFile(filePath, JSON.stringify(patients, null, 2), 'utf-8')
+
+  const csvPath = path.resolve(process.cwd(), 'data', 'patients.csv')
+  await fs.writeFile(csvPath, serializeCsv(patients), 'utf-8')
 }
 
 export function normalizeDigits(value) {
@@ -105,6 +110,21 @@ export function formatDateBR(value) {
     return `${d}/${m}/${y}`
   }
   return raw
+}
+
+export function serializeCsv(patients) {
+  const header = ['Nome Completo', 'Celular', 'CPF', 'Sexo', 'Data de Nascimento', 'Email']
+  const rows = patients.map((p) => [
+    p.nome_completo || '',
+    formatCelular(p.celular),
+    formatCPF(p.cpf),
+    p.sexo || '',
+    formatDateBR(p.data_nascimento),
+    p.email || ''
+  ])
+  return [header, ...rows]
+    .map((r) => r.map((c) => (c || '').toString().replace(/\r?\n/g, ' ')).join(','))
+    .join('\n')
 }
 
 export function normalizeRecord(body) {
